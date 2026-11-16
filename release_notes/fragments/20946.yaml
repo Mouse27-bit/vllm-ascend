@@ -1,0 +1,4 @@
+pr: 20946
+entries:
+  - category: bugfix
+    text: Step5 Mooncake PD now leaves the final prompt token to Decode, aligning transferred CSA state and sliding-window page retention with the continuation position.

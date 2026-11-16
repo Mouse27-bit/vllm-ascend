@@ -38,6 +38,7 @@ from vllm_ascend.distributed.kv_transfer.kv_p2p.mooncake.metadata import (
     MooncakeTransferMetadataGroups,
 )
 from vllm_ascend.distributed.kv_transfer.kv_p2p.mooncake.utils import zmq_ctx
+from vllm_ascend.models.step5.cache_config import is_step5_groups
 
 if TYPE_CHECKING:
     from vllm.v1.core.kv_cache_manager import KVCacheBlocks
@@ -452,7 +453,9 @@ class MooncakeBaseConnectorScheduler:
         has_state_group = any(
             isinstance(spec, MambaSpec) for group_specs in self.group_unique_specs for spec in group_specs
         )
-        return uses_compressed_cache or has_state_group
+        # Step5 must transfer its CSA state before the final prompt token,
+        # and retain SWA pages for that same continuation position on both ends.
+        return uses_compressed_cache or has_state_group or is_step5_groups(self.kv_cache_groups)
 
     @staticmethod
     def _get_group_unique_specs(group: Any) -> list[Any]:
