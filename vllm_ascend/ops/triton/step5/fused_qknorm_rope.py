@@ -2,23 +2,23 @@
 """fused_qknorm_rope -- Ascend release build (self-contained).
 
 Independent publishable operator: RMSNorm + NeoX RoPE fused into one SIMD
-Triton kernel for Ascend (910B, Triton-Ascend backend), with in-kernel V
-passthrough. No dependency on inference/kernel.py or _npu_adapt.apply();
-import and call ``fused_qknorm_rope`` directly.
+Triton kernel for Ascend (A5 / Ascend 950, Triton-Ascend backend), with
+in-kernel V passthrough. No dependency on inference/kernel.py or
+_npu_adapt.apply(); import and call ``fused_qknorm_rope`` directly.
 
 Numerical contract: this is an Ascend-specific SIMD implementation (vector
 tree reduction for RMSNorm). RoPE rotation angles are read from the
 caller-provided cos/sin cache (per-layer rope_theta / rope_scaling are baked
 into that cache by the caller). It is NOT bit-identical to the CUDA per-lane
 FMA/XOR-tree reference; it matches it within RMSNorm/RoPE tolerance (see
-check_precision.py).
+tests/e2e/nightly/single_node/ops/singlecard_ops/triton/test_step5_fused_qknorm_rope.py).
 
 Interface (same as the original):
     q, k, v = fused_qknorm_rope(qkv, q_weight, k_weight, cos, sin, positions,
                                 head_dim=192, num_q_heads=16, num_kv_heads=1,
                                 rotary_pairs=96, eps=1e-5, norm_weight_bias=1.0)
 """
-
+#TODO: This will be deleted after qkv_rmsnorm_rope_simt supported head_dim=192
 from __future__ import annotations
 
 import torch
@@ -28,8 +28,14 @@ from vllm.utils.torch_utils import direct_register_custom_op
 HEAD_DIM: int = 192
 EPS: float = 1e-5
 NORM_WEIGHT_BIAS: float = 1.0
+# tl.arange tile extents must be powers of two: the 192-lane head dim pads
+# to BLOCK_D and the up-to-96 rotary pairs pad to BLOCK_R.
+BLOCK_D = 256
+BLOCK_R = 128
 
 
+# Tune the tokens-per-program tile; the winning config is keyed on the
+# token count.
 @triton.autotune(
     configs=[triton.Config({"BLOCK_M": bm}) for bm in [4, 8, 16, 32]],
     key=["tokens"],
@@ -207,8 +213,8 @@ def _fused_qknorm_rope_impl(
         EPS=float(eps),
         NORM_WEIGHT_BIAS=float(norm_weight_bias),
         HEAD_DIM=HEAD_DIM,
-        BLOCK_D=256,
-        BLOCK_R=128,
+        BLOCK_D=BLOCK_D,
+        BLOCK_R=BLOCK_R,
     )
     return q_out, k_out, v_out
 

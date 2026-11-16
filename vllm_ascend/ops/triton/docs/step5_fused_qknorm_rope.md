@@ -2,6 +2,7 @@
 
 ## Description
 
+- **This kernel will be removed after qkv_rmsnorm_rope_simt supports head_dim=192**
 - **Function**: Splits the fused Step5 attention QKV projection `[ q | k | v ]`,
   applies per-head RMSNorm (optional zero-centered Gemma bias) to Q and K,
   NeoX-style RoPE to the normed Q and K, and copies V through untouched, all
