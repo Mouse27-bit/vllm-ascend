@@ -26,7 +26,7 @@ def make_ids(positions, groups, topk, region_size, device):
     return ids.repeat(groups, 1).contiguous()  # group-major [G*T, topk]
 
 
-def ref_append_current_region(ids, positions, groups, region_size):
+def refappend_current_region(ids, positions, groups, region_size):
     rows, topk = ids.shape
     tokens = rows // groups
     live = (ids != -1).sum(dim=1)
@@ -63,7 +63,7 @@ def ref_append_current_region(ids, positions, groups, region_size):
         (16, 2, 64, 4096, torch.int64),
     ],
 )
-def test_append_current_region(tokens, groups, topk, max_pos, pos_dtype):
+def testappend_current_region(tokens, groups, topk, max_pos, pos_dtype):
     torch.manual_seed(0)
     device = "npu"
     region_size = 8
@@ -72,9 +72,9 @@ def test_append_current_region(tokens, groups, topk, max_pos, pos_dtype):
 
     wide, counts = append_current_region(ids, positions, groups=groups, region_size=region_size)
 
-    wide_ref, counts_ref = ref_append_current_region(ids, positions, groups, region_size)
-    assert torch.equal(wide, wide_ref), "packed ids mismatch"
-    assert torch.equal(counts, counts_ref), "block counts mismatch"
+    wide_ref, counts_ref = refappend_current_region(ids, positions, groups, region_size)
+    torch.testing.assert_close(wide, wide_ref, rtol=0, atol=0, msg="packed ids mismatch")
+    torch.testing.assert_close(counts, counts_ref, rtol=0, atol=0, msg="block counts mismatch")
 
     gc.collect()
     torch.npu.empty_cache()
