@@ -1,0 +1,4 @@
+pr: 20946
+entries:
+  - category: bugfix
+    text: Mooncake PD now leaves the final prompt token to Decode for sliding-window caches, including Step5, aligning page retention and transferred state with the continuation position.
